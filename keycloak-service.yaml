@@ -1,0 +1,27 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: keycloak
+  labels:
+    app: keycloak
+spec:
+  ports:
+    - name: keycloak
+      protocol: TCP
+      port: 8443
+      targetPort: 8443
+    - name: keycloak-http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: proxy
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+  selector:
+    app: keycloak
+    component: keycloak
+  type: ClusterIP
+  sessionAffinity: None
+status:
+  loadBalancer: {}
