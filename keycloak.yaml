@@ -1,0 +1,183 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  selfLink: /apis/apps/v1/namespaces/rhsso/statefulsets/keycloak
+  resourceVersion: '927309'
+  name: keycloak
+  uid: 03de3678-d16e-442d-bcd7-9bfbc6d0c0ee
+  creationTimestamp: '2020-07-31T15:54:32Z'
+  generation: 11
+  namespace: rhsso
+  ownerReferences:
+    - apiVersion: keycloak.org/v1alpha1
+      kind: Keycloak
+      name: example
+      uid: 0097e75c-394a-4413-860f-dce322f37675
+      controller: true
+      blockOwnerDeletion: true
+  labels:
+    app: keycloak
+    component: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+      component: keycloak
+  template:
+    metadata:
+      name: keycloak
+      namespace: rhsso
+      creationTimestamp: null
+      labels:
+        app: keycloak
+        component: keycloak
+    spec:
+      volumes:
+        - name: sso-x509-https-secret
+          secret:
+            secretName: sso-x509-https-secret
+            defaultMode: 420
+            optional: true
+        - name: keycloak-extensions
+          emptyDir: {}
+        - name: keycloak-probes
+          configMap:
+            name: keycloak-probes
+            defaultMode: 365
+        - name: config-volume
+          configMap:
+            name: nginx-conf
+            defaultMode: 420
+      initContainers:
+        - name: extensions-init
+          image: 'quay.io/keycloak/keycloak-init-container:master'
+          env:
+            - name: KEYCLOAK_EXTENSIONS
+              value: >-
+                https://github.com/aerogear/keycloak-metrics-spi/releases/download/1.0.4/keycloak-metrics-spi-1.0.4.jar
+          resources: {}
+          volumeMounts:
+            - name: keycloak-extensions
+              mountPath: /opt/extensions
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+      containers:
+        - name: sidecar
+          image: twalter/openshift-nginx
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          imagePullPolicy: Always
+        - resources: {}
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - '-c'
+                - /probes/readiness_probe.sh
+            initialDelaySeconds: 40
+            timeoutSeconds: 22
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 30
+          terminationMessagePath: /dev/termination-log
+          name: keycloak
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - '-c'
+                - /probes/liveness_probe.sh
+            initialDelaySeconds: 30
+            timeoutSeconds: 22
+            periodSeconds: 30
+            successThreshold: 1
+            failureThreshold: 30
+          env:
+            - name: DB_VENDOR
+              value: POSTGRES
+            - name: DB_SCHEMA
+              value: public
+            - name: DB_ADDR
+              value: keycloak-postgresql.rhsso.svc.cluster.local
+            - name: DB_DATABASE
+              value: root
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-secret
+                  key: POSTGRES_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: NAMESPACE
+              value: rhsso
+            - name: JGROUPS_DISCOVERY_PROTOCOL
+              value: dns.DNS_PING
+            - name: JGROUPS_DISCOVERY_PROPERTIES
+              value: dns_query=keycloak-discovery.rhsso.svc.cluster.local
+            - name: CACHE_OWNERS_COUNT
+              value: '2'
+            - name: CACHE_OWNERS_AUTH_SESSIONS_COUNT
+              value: '2'
+            - name: KEYCLOAK_USER
+              valueFrom:
+                secretKeyRef:
+                  name: credential-example
+                  key: ADMIN_USERNAME
+            - name: KEYCLOAK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: credential-example
+                  key: ADMIN_PASSWORD
+            - name: PROXY_ADDRESS_FORWARDING
+              value: 'true'
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+            - containerPort: 8443
+              protocol: TCP
+            - containerPort: 9990
+              protocol: TCP
+            - containerPort: 8778
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: keycloak-extensions
+              mountPath: /opt/jboss/keycloak/providers
+            - name: keycloak-probes
+              mountPath: /probes
+          terminationMessagePolicy: File
+          image: 'quay.io/keycloak/keycloak:11.0.0'
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  serviceName: ''
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0
+  revisionHistoryLimit: 10
+status:
+  observedGeneration: 11
+  replicas: 1
+  readyReplicas: 1
+  currentReplicas: 1
+  updatedReplicas: 1
+  currentRevision: keycloak-7ffc4dd896
+  updateRevision: keycloak-7ffc4dd896
+  collisionCount: 0
