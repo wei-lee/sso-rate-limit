@@ -49,20 +49,6 @@ spec:
           configMap:
             name: nginx-conf
             defaultMode: 420
-      initContainers:
-        - name: extensions-init
-          image: 'quay.io/keycloak/keycloak-init-container:master'
-          env:
-            - name: KEYCLOAK_EXTENSIONS
-              value: >-
-                https://github.com/aerogear/keycloak-metrics-spi/releases/download/1.0.4/keycloak-metrics-spi-1.0.4.jar
-          resources: {}
-          volumeMounts:
-            - name: keycloak-extensions
-              mountPath: /opt/extensions
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          imagePullPolicy: Always
       containers:
         - name: sidecar
           image: twalter/openshift-nginx
